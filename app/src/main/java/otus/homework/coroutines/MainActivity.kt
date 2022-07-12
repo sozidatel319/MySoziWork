@@ -2,8 +2,9 @@ package otus.homework.coroutines
 
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import android.widget.Toast
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : AppCompatActivity(), ErrorReceived {
 
     lateinit var catsPresenter: CatsPresenter
 
@@ -15,8 +16,9 @@ class MainActivity : AppCompatActivity() {
         val view = layoutInflater.inflate(R.layout.activity_main, null) as CatsView
         setContentView(view)
 
-        catsPresenter = CatsPresenter(diContainer.service)
+        catsPresenter = CatsPresenter(diContainer.service, diContainer.avatarService,this)
         view.presenter = catsPresenter
+
         catsPresenter.attachView(view)
         catsPresenter.onInitComplete()
     }
@@ -26,5 +28,9 @@ class MainActivity : AppCompatActivity() {
             catsPresenter.detachView()
         }
         super.onStop()
+    }
+
+    override fun error(text: String) {
+        Toast.makeText(this, text, Toast.LENGTH_LONG).show()
     }
 }
