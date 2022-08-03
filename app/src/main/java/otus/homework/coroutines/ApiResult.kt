@@ -3,7 +3,7 @@ package otus.homework.coroutines
 import retrofit2.HttpException
 import retrofit2.Response
 
-sealed interface ApiResult<T : Any>
+sealed interface ApiResult<T>
 
 class ApiSuccess<T : Any>(val data: T) : ApiResult<T>
 class ApiError<T : Any>(val code: Int, val message: String?) : ApiResult<T>

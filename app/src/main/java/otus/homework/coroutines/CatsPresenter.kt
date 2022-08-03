@@ -30,7 +30,7 @@ class CatsPresenter(
                     avatarService.getCatImageResult()
                 }
 
-                val pic: String? =  when(avatarResult){
+                val pic: String? = when (avatarResult) {
                     is ApiSuccess -> avatarResult.data.file
                     is ApiError -> null
                     is ApiException -> null
@@ -40,7 +40,7 @@ class CatsPresenter(
                     catsService.getCatFactResult()
                 }
 
-                val fact:String? = when(factResult){
+                val fact: String? = when (factResult) {
                     is ApiSuccess -> factResult.data.text
                     is ApiError -> null
                     is ApiException -> null
@@ -56,6 +56,9 @@ class CatsPresenter(
                         CrashMonitor.trackWarning(e)
                         e.localizedMessage?.let { errorReceived.error(it) }
                         e.printStackTrace()
+                        if (e is CancellationException) {
+                            throw e
+                        }
                     }
                 }
             }

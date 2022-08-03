@@ -9,72 +9,56 @@ import java.net.SocketTimeoutException
 
 class CatsViewModel(
     private val catsService: CatsService,
-    private val avatarService: CatsAvatarService,
-    private val errorReceived: ErrorReceived,
-    private val view: ICatsView
+    private val avatarService: CatsAvatarService
 ) : ViewModel() {
 
     private val mutablePictureLiveData = MutableLiveData<ApiResult<PictureLink>>()
     private val mutableFactLiveData = MutableLiveData<ApiResult<Fact>>()
-    val catsData: LiveData<ApiResult<PictureLink>> get() = mutablePictureLiveData
-    val factData: LiveData<ApiResult<Fact>> get() = mutableFactLiveData
+    private val mutableFinalLiveData = MutableLiveData<ApiResult<Pair<String?, String?>>>()
+    val finalDataCats: LiveData<ApiResult<Pair<String?, String?>>> get() = mutableFinalLiveData
+    private var scope: Job? = null
 
     init {
-        attachView()
-        viewModelScope.launch(CoroutineExceptionHandler { coroutineContext, throwable ->
-            when (throwable) {
-                is SocketTimeoutException -> {
-                    errorReceived.error("Не удалось получить ответ от сервера")
-                }
-                else -> {
-                    CrashMonitor.trackWarning(throwable)
-                    throwable.localizedMessage?.let { errorReceived.error(it) }
-                    throwable.printStackTrace()
+        scope = viewModelScope.launch {
+            lateinit var factResult: Deferred<ApiResult<Fact>>
+            lateinit var avatarResult: Deferred<ApiResult<PictureLink>>
+
+            viewModelScope.apply {
+                try {
+                    factResult = async {
+                        handleApi {
+                            catsService.getCatFactResult()
+                        }
+                    }
+
+                    avatarResult = async {
+                        handleApi {
+                            avatarService.getCatImageResult()
+                        }
+                    }
+
+                } catch (exception: Exception) {
+                    if (exception is SocketTimeoutException) {
+                        mutableFinalLiveData.value =
+                            ApiError(0, "Не удалось получить ответ от сервера")
+                    } else {
+                        CrashMonitor.trackWarning(exception)
+                        mutableFinalLiveData.value = ApiException(exception)
+                        exception.printStackTrace()
+                    }
                 }
             }
-        }) {
-            onInitComplete()
+            mutableFinalLiveData.value = ApiSuccess(
+                Pair(
+                    (factResult.await() as ApiSuccess).data.text,
+                    (avatarResult.await() as ApiSuccess).data.file
+                )
+            )
         }
-    }
-
-    private var _catsView: ICatsView? = null
-
-    private val job = Job()
-
-    private suspend fun onInitComplete() {
-
-        val avatarResult = handleApi {
-            avatarService.getCatImageResult()
-        }
-
-        val pic: String? = when (avatarResult) {
-            is ApiSuccess -> avatarResult.data.file
-            is ApiError -> null
-            is ApiException -> null
-        }
-
-        val factResult = handleApi {
-            catsService.getCatFactResult()
-        }
-
-        val fact: String? = when (factResult) {
-            is ApiSuccess -> factResult.data.text
-            is ApiError -> null
-            is ApiException -> null
-        }
-        mutablePictureLiveData.value = avatarResult
-        mutableFactLiveData.value = factResult
-
-        _catsView?.populate(fact, pic)
     }
 
     override fun onCleared() {
         super.onCleared()
-        job.cancel()
-        _catsView = null
-    }
-
-    private fun attachView() {
-        _catsView = view
+        scope?.cancel()
     }
 }
